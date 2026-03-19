@@ -1,6 +1,5 @@
-from copy import deepcopy
-from pprint import pprint
-from .levels import Levels, levels
+ROWS = 6
+COLS = 7
 
 
 class BitBoard:
@@ -17,12 +16,8 @@ class BitBoard:
         self.opponent = 0  # Current opponent's board
 
     def __str__(self):
-        pprint(self.level.layout)
-        return ""
+        return f"Player bits: {self.player:042b}"
 
-    def __repr__(self):
-        self.__str__()
-        return ""
 
     def switch_turn(self):
         self.player, self.opponent = self.opponent, self.player
@@ -43,7 +38,7 @@ class BitBoard:
                 return True
         return False
 
-    def _col_mask(col: int) -> int:
+    def _col_mask(self, col: int) -> int:
         """Create mask for a column"""
         # (1 << 6) - 1 = 111111 (6 bits)
         return ((1 << 6) - 1) << (col * 7)
@@ -59,6 +54,9 @@ class BitBoard:
             return False  # Column full
 
         # Get lowest empty bit (closest to bottom)
+        # -x = ~x + 1
+        # x = [bits] 1 [0's]
+        # -x = [~bits] 1 [0's]
         move_bit = empty_in_col & -empty_in_col
         self.player |= move_bit
         return True
