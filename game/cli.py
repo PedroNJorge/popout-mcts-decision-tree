@@ -1,4 +1,5 @@
 import curses
+import time
 from .board import BitBoard, ROWS, COLS
 
 EMPTY = '-'
@@ -83,7 +84,7 @@ class PopoutCLI:
 
         # Draw instructions
         help_y = status_y + 1
-        help_text = "←/→ move | d drop | p popout | q quit"
+        help_text = "←/→ move | d drop | p popout | t tie | q quit"
         self.stdscr.addstr(help_y, start_x, help_text)
 
         self.stdscr.refresh()
@@ -97,13 +98,25 @@ class PopoutCLI:
             return True
         return False
 
+    def can_draw(self):
+        """Check if player can draw"""
+        return self.bitboard.can_draw()
+
     def popout_piece(self):
         """Popout piece from current column"""
-        return False
-        if self.bitboard.popout(self.cursor_col):
+        if self.bitboard.popout_piece(self.cursor_col):
             # Check win after popout
             if self.bitboard.win():
                 return "WIN"
+
+            # Need to temporarily switch to opponent's perspective to check their win
+            self.bitboard.switch_turn()
+            opponent_wins = self.bitboard.win()
+            self.bitboard.switch_turn()  # Switch back to current player
+
+            if opponent_wins:
+                return "OPPONENT_WIN"
+
             return True
         return False
 
@@ -134,32 +147,61 @@ class PopoutCLI:
                     break
                 elif not result:
                     self.show_message("Column full!")
-                self.switch_turn()
+                else:
+                    self.switch_turn()
 
             elif key == ord('p'):
                 result = self.popout_piece()
                 if result == "WIN":
                     self.show_game_over()
                     break
+                elif result == "OPPONENT_WIN":
+                    self.switch_turn()
+                    self.show_game_over()
+                    break
                 elif not result:
                     self.show_message("Not your piece at bottom!")
-                self.switch_turn()
+                else:
+                    self.switch_turn()
+
+            elif key == ord('t'):
+                result = self.can_draw()
+                self.log(f"CAN DRAW: {result}")
+                self.log(f"Player: {self.bitboard.player:X}")
+                self.log(f"Opponent: {self.bitboard.opponent:X}")
+                self.log(f"Empty: {self.bitboard.get_empty():X}")
+                self.log(f"Occupied: {self.bitboard.get_occupied():X}")
+
+                if result:
+                    self.show_game_over(draw=True)
+                    break
 
     def show_message(self, msg):
         """Show a temporary message"""
+        # Clear any pending input
+        self.stdscr.nodelay(True)
+        while self.stdscr.getch() != -1:
+            pass  # Flush input buffer
+        self.stdscr.nodelay(False)
+
         height, width = self.stdscr.getmaxyx()
         msg_y = height // 2 + ROWS + 4
         msg_x = (width - len(msg)) // 2
         self.stdscr.addstr(msg_y, msg_x, msg)
         self.stdscr.refresh()
-        curses.napms(1000)  # Show for 1 second
 
-    def show_game_over(self):
+        # Wait without processing input
+        time.sleep(1)
+
+    def show_game_over(self, draw=False):
         """Show game over screen"""
         self.draw_board()
 
         height, width = self.stdscr.getmaxyx()
-        msg = f"GAME OVER! Player {self.player} wins!"
+        if draw:
+            msg = "GAME ENDS WITH A TIE!"
+        else:
+            msg = f"GAME OVER! Player {self.player} wins!"
         msg_y = height // 2 + ROWS + 2
         msg_x = (width - len(msg)) // 2
 
@@ -168,9 +210,11 @@ class PopoutCLI:
         self.stdscr.refresh()
         self.stdscr.getch()
 
+
 def main(stdscr):
     game = PopoutCLI(stdscr)
     game.run()
+
 
 if __name__ == "__main__":
     curses.wrapper(main)
