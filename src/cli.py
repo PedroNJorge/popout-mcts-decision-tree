@@ -1,16 +1,16 @@
 import curses
 import time
-from .board import BitBoard, ROWS, COLS
+from .game import PopOut, ROWS, COLS
 
 EMPTY = '-'
 PLAYER1 = 'X'
 PLAYER2 = 'O'
 
 
-class PopoutCLI:
+class PopOutCLI:
     def __init__(self, stdscr):
         self.stdscr = stdscr
-        self.bitboard = BitBoard()
+        self.game = PopOut()
         self.cursor_col = COLS // 2  # Start in middle
         self.player = PLAYER1
         self.opponent = PLAYER2
@@ -93,11 +93,11 @@ class PopoutCLI:
             if row >= ROWS or col >= COLS:
                 continue
 
-            if (self.bitboard.player >> bit) & 1:
+            if (self.game.player >> bit) & 1:
                 # Convert bottom-oriented row to display-oriented row
                 display_row = ROWS - 1 - row
                 display[display_row][col] = self.player
-            elif (self.bitboard.opponent >> bit) & 1:
+            elif (self.game.opponent >> bit) & 1:
                 display_row = ROWS - 1 - row
                 display[display_row][col] = self.opponent
 
@@ -153,7 +153,7 @@ class PopoutCLI:
             self.stdscr.addstr(help_y, start_x, help_text)
 
             # If can draw show
-            draw_status = self.bitboard.get_draw_status()
+            draw_status = self.game.get_draw_status()
             if draw_status == "BOARD_FULL":
                 tie_x = start_x + 2*COLS + 3
                 tie_y = nums_y + ROWS // 2
@@ -181,7 +181,7 @@ class PopoutCLI:
         if bold:
             self.stdscr.addstr(msg_y, msg_x, msg, curses.A_BOLD)
         else:
-            self.stdscr.addstr(msg_y, msg_x, msg, curses.A_BOLD)
+            self.stdscr.addstr(msg_y, msg_x, msg)
         self.stdscr.refresh()
 
         # Wait without processing input
@@ -213,11 +213,11 @@ class PopoutCLI:
 
     def drop_piece(self):
         """Drop piece in current column"""
-        return self.bitboard.drop_piece(self.cursor_col)
+        return self.game.drop_piece(self.cursor_col)
 
     def popout_piece(self):
         """Popout piece from current column"""
-        return self.bitboard.popout_piece(self.cursor_col)
+        return self.game.popout_piece(self.cursor_col)
 
     def run(self):
         """Main game loop"""
@@ -262,16 +262,7 @@ class PopoutCLI:
                     break
 
             elif key == ord('t'):
-                status = self.bitboard.get_draw_status()
+                status = self.game.get_draw_status()
                 if status is not None:
                     self.show_game_over(draw=True)
                     break
-
-
-def main(stdscr):
-    game = PopoutCLI(stdscr)
-    game.run()
-
-
-if __name__ == "__main__":
-    curses.wrapper(main)

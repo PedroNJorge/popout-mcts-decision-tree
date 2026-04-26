@@ -1,9 +1,11 @@
 import curses
-from game import PopoutCLI
+from src import PopOutCLI
+
 
 def main(stdscr):
-    game = PopoutCLI(stdscr)
+    game = PopOutCLI(stdscr)
     game.run()
+
 
 if __name__ == "__main__":
     curses.wrapper(main)

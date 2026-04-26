@@ -5,7 +5,7 @@ ROWS = 6
 COLS = 7
 
 
-class BitBoard:
+class PopOut:
     def __init__(self, first_player: int = 0):
         """
         Each bitboard is of the format [col0], [col1], ..., [col6],
