@@ -1,9 +1,12 @@
+from .zobrist import Zobrist
+from collections import defaultdict
+
 ROWS = 6
 COLS = 7
 
 
 class BitBoard:
-    def __init__(self):
+    def __init__(self, first_player: int = 0):
         """
         Each bitboard is of the format [col0], [col1], ..., [col6],
         where col_i = 6 bits, i = 0(1)6.
@@ -22,11 +25,27 @@ class BitBoard:
         self.player = 0    # Current player's board
         self.opponent = 0  # Current opponent's board
 
+        self.cur_player = 0  # ID: 0 or 1
+        self.zobrist = Zobrist()
+        self.state_counts = defaultdict(int)
+
+        self._record_state()  # Record initial state
+
     def __str__(self):
         return f"Player bits: {self.player:042b}"
 
+    def _get_current_hash(self):
+        return self.zobrist.get_hash(self.player, self.opponent, self.cur_player)
+
+    def _record_state(self):
+        self.state_counts[self._get_current_hash()] += 1
+
+    def is_threefold_repetition(self) -> bool:
+        return self.state_counts[self._get_current_hash()] >= 3
+
     def switch_turn(self):
         self.player, self.opponent = self.opponent, self.player
+        self.cur_player = 1 - self.cur_player
 
     def get_occupied(self) -> int:
         return (self.player | self.opponent) | self.filler_mask
@@ -34,12 +53,21 @@ class BitBoard:
     def get_empty(self) -> int:
         return ~self.get_occupied() & 0x3FFFFFFFFFF  # 42 bit mask
 
-    def win(self) -> bool:
-        """Check if player wins"""
+    def win(self, opponent=False) -> bool:
+        """
+        Check if player wins.
+
+        Args:
+            opponent: Enable win check of opponent instead
+        """
+        bitboard = self.player
+        if opponent:
+            bitboard = self.opponent
+
         # All directions: horizontal (1), vertical (7),
         # diagonal down-right (6), diagonal up-right (8)
         for shift in [1, 7, 6, 8]:
-            m = self.player & (self.player >> shift)
+            m = bitboard & (bitboard >> shift)
             if m & (m >> (2 * shift)):
                 return True
         return False
@@ -49,15 +77,23 @@ class BitBoard:
         # (1 << 6) - 1 = 111111 (6 bits)
         return ((1 << 6) - 1) << (col * 7)
 
-    def drop_piece(self, col: int) -> bool:
-        """Drop piece like in Connect 4"""
+    def drop_piece(self, col: int) -> tuple[bool, int | None]:
+        """
+        Drop piece like in Connect 4
+
+        Args:
+            col: column to drop piece
+
+        Returns:
+            (ValidMove, WinnerAfterMove)
+        """
         # Find lowest empty row in column
         col_mask = self._col_mask(col)
         occupied = self.get_occupied()
         empty_in_col = (~occupied) & col_mask
 
         if empty_in_col == 0:
-            return False  # Column full
+            return (False, None)  # Column full
 
         # Get lowest empty bit (closest to bottom)
         # -x = ~x + 1
@@ -65,9 +101,15 @@ class BitBoard:
         # -x = [~bits] 1 [0's]
         move_bit = empty_in_col & -empty_in_col
         self.player |= move_bit
-        return True
 
-    def popout_piece(self, col: int) -> bool:
+        if self.win():
+            return (True, self.cur_player)
+
+        self.switch_turn()
+        self._record_state()
+        return (True, None)
+
+    def popout_piece(self, col: int) -> tuple[bool, int | None]:
         """
         Pop out the player's own piece from the bottom of a column.
         The piece is removed and all pieces above it fall down.
@@ -76,7 +118,7 @@ class BitBoard:
             col: Column index (0-6) to pop from
 
         Returns:
-            bool: True if successful, False if invalid move
+            (ValidMove, WinnerAfterMove)
         """
         # Check if column is empty
         col_mask = self._col_mask(col)
@@ -84,14 +126,14 @@ class BitBoard:
 
         # Check if there's any piece in this column
         if (occupied & col_mask) == 0:
-            return False  # Column is empty
+            return (False, None)  # Column is empty
 
         # Get the bottom-most piece in the column
         bottom_bit = 1 << (col * 7)  # Row 0 is bottom
 
         # Check if the bottom piece belongs to the current player
         if not (self.player & bottom_bit):
-            return False  # Bottom piece is not owned by current player
+            return (False, None)  # Bottom piece is not owned by current player
 
         # Remove the bottom piece
         self.player &= ~bottom_bit
@@ -112,12 +154,26 @@ class BitBoard:
                 self.opponent &= ~current_bit
                 self.opponent |= below_bit
 
-        return True
+        if self.win():
+            return (True, self.cur_player)
+        elif self.win(opponent=True):
+            return (True, 1 - self.cur_player)
 
-    def can_draw(self) -> bool:
+        self.switch_turn()
+        self._record_state()
+        return (True, None)
+
+    def get_draw_status(self) -> str | None:
         """
-        Checks if board is full and if so the player can draw the game.
+        Return the current draw status
+
+        Returns:
+            "BOARD_FULL": Board is full --- player decides
+            "THREE_FOLD": Three-fold repetition occured --- either player can claim
+            None: No draw available
         """
         if self.get_empty() == 0:
-            return True
-        return False
+            return "BOARD_FULL"
+        elif self.is_threefold_repetition():
+            return "THREE_FOLD"
+        return None
