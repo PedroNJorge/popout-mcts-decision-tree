@@ -21,7 +21,7 @@ class PopOut:
         for col in range(7):
             self.filler_mask |= (1 << (col * 7 + 6))  # bit 6 of each column
 
-        # Board size is 6x7 = 42 bits
+        # Board size is 6x7 = 42 bits + 6 filler bits
         self.player = 0    # Current player's board
         self.opponent = 0  # Current opponent's board
 
@@ -32,16 +32,30 @@ class PopOut:
         self._record_state()  # Record initial state
 
     def __str__(self):
-        return f"Player bits: {self.player:042b}"
+        return f"Player bits: {self.player:042b}\nOpponent bits: {self.opponent:042b}\n"
 
-    def _get_current_hash(self):
+    def copy(self):
+        """Create a lightweight copy with only essential attributes."""
+        new = PopOut.__new__(PopOut)
+        new.filler_mask = self.filler_mask
+        new.player = self.player
+        new.opponent = self.opponent
+        new.cur_player = self.cur_player
+        new.zobrist = self.zobrist
+        new.state_counts = self.state_counts.copy()
+        return new
+
+    def get_hash(self):
+        """
+        Returns Canonical Hash
+        """
         return self.zobrist.get_hash(self.player, self.opponent, self.cur_player)
 
     def _record_state(self):
-        self.state_counts[self._get_current_hash()] += 1
+        self.state_counts[self.get_hash()] += 1
 
     def is_threefold_repetition(self) -> bool:
-        return self.state_counts[self._get_current_hash()] >= 3
+        return self.state_counts[self.get_hash()] >= 3
 
     def switch_turn(self):
         self.player, self.opponent = self.opponent, self.player
