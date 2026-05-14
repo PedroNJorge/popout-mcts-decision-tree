@@ -43,8 +43,11 @@ class Zobrist:
 
     def get_hash(self, player, opponent, cur_player):
         """
-        Returns canonical hash
+        Returns:
+            (isMirrored, Canonical hash)
         """
         h_normal = self._compute_hash(player, opponent, cur_player)
         h_mirror = self._compute_hash(self._mirror(player), self._mirror(opponent), cur_player)
-        return min(h_normal, h_mirror)
+        if h_mirror < h_normal:
+            return True, h_mirror
+        return False, h_normal

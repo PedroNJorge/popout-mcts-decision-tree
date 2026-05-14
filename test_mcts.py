@@ -1,19 +1,14 @@
 from src import MCTS, PopOut
 
 if __name__ == "__main__":
-    # Test with a game
-    game = PopOut(first_player=0)
-    mcts = MCTS(exploration_constant=1.414, max_simulations=10000)
+    game = PopOut()
+    mcts = MCTS(exploration_constant=1, max_simulations=10000)
 
-    # Get best move
-    move = mcts.get_best_move(game)
-    print(f"Best move: {move}")
-
-    # Get full policy
-    print(game)
-    policy = mcts.search(game, simulations=10000)
-    print("\nAction probabilities:")
-    for move, prob in sorted(policy.items(), key=lambda x: -x[1])[:]:
-        print(f"  {move}: {prob:.3f}")
-
-    print(f"\nTransposition table size: {len(mcts.tt.table)}")
+    for c in [1.0, 1.1, 1.2, 1.3]:
+        print(f"C = {c}")
+        for s in [1000, 10000, 50000]:
+            mcts = MCTS(exploration_constant=c, max_simulations=s)
+            policy = mcts.search(game, show_progress=True)
+            print("Action probabilities:")
+            for move, prob in sorted(policy.items(), key=lambda x: -x[1])[:]:
+                print(f"  {move}: {prob:.3f}")
