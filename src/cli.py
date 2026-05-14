@@ -1,9 +1,7 @@
 import curses
 import time
 from .game import PopOut, ROWS, COLS
-from .players.human import HumanPlayer
-from .players.random_player import RandomPlayer
-from .players.mcts_player import MCTSPlayer
+from .players import HumanPlayer, RandomPlayer, MCTSPlayer
 
 class PopOutCLI:
     def __init__(self, stdscr):
