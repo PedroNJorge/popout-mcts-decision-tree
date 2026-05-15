@@ -247,6 +247,14 @@ class MCTS:
             if child_entry.is_terminal or child_hash in visited:
                 continue
 
+            # The canonical action recorded when this edge was created may no
+            # longer have a valid physical counterpart in the current state
+            # (e.g. a popout changed column availability on a transposed path).
+            # Skip rather than crash.
+            candidates = self._physical_actions(state, canonical_action)
+            if not candidates:
+                continue
+
             # UCB1 formula
             ucb = self.ucb1(edge, N_parent_total)
 
@@ -254,13 +262,11 @@ class MCTS:
                 best_value = ucb
 
                 # Generate child state
-                candidates = self._physical_actions(state, canonical_action)
-                assert candidates
                 physical_action = candidates[0]
-
                 child_state = self._transition(state, physical_action)
                 if child_state is None:
-                    print("Invalid action used in _select_best_child!")
+                    # Transition failed despite action appearing valid; skip.
+                    continue
 
                 best_child = self.node_cache[child_hash]
                 best_state = child_state

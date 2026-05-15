@@ -220,3 +220,7 @@ class PopOut:
         elif self.is_threefold_repetition():
             return "THREE_FOLD"
         return None
+    
+    def get_raw_hash(self) -> int:
+        """Returns raw (non-canonical) hash without mirror normalization"""
+        return self.zobrist._compute_hash(self.player, self.opponent, self.cur_player)
