@@ -1,3 +1,4 @@
+from .types import Action
 from .zobrist import Zobrist
 from collections import defaultdict
 
@@ -8,20 +9,19 @@ COLS = 7
 class PopOut:
     def __init__(self, first_player: int = 0):
         """
-        Each bitboard is of the format [col0], [col1], ..., [col6],
-        where col_i = 6 bits, i = 0(1)6.
+        Each bitboard is of the format:
+            [col6]0[col5]0[col4]0[col3]0[col2]0[col1]0[col0]
 
-        Note: Row0 is the bottom of the board.
-        Each col_i is of the format [row0, row1, ..., row5]
-
-        Between each col_i there is a filler bit
+        Note: between each [col_i] and [col_j] there is a filler bit;
+              the right-most bit in [col_i] represents row0, and the
+              left-most bit represents row5
         """
         # Create filler mask (bit 6 of each column)
         self.filler_mask = 0
         for col in range(7):
             self.filler_mask |= (1 << (col * 7 + 6))  # bit 6 of each column
 
-        # Board size is 6x7 = 42 bits
+        # Board size is 6x7 = 42 bits + 6 filler bits
         self.player = 0    # Current player's board
         self.opponent = 0  # Current opponent's board
 
@@ -32,18 +32,51 @@ class PopOut:
         self._record_state()  # Record initial state
 
     def __str__(self):
-        return f"Player bits: {self.player:042b}"
+        display = [['-' for _ in range(COLS)] for _ in range(ROWS)]
+        for bit in range(48):
+            col = bit // 7
+            row = bit % 7
+            if row >= ROWS or col >= COLS:
+                continue
+            if (self.player >> bit) & 1:
+                display_row = ROWS - 1 - row
+                display[display_row][col] = 'O'
+            elif (self.opponent >> bit) & 1:
+                display_row = ROWS - 1 - row
+                display[display_row][col] = 'X'
+        return '\n'.join(' '.join(row) for row in display)
 
-    def _get_current_hash(self):
+    def copy(self):
+        """Create a lightweight copy with only essential attributes."""
+        new = PopOut.__new__(PopOut)
+        new.filler_mask = self.filler_mask
+        new.player = self.player
+        new.opponent = self.opponent
+        new.cur_player = self.cur_player
+        new.zobrist = self.zobrist
+        new.state_counts = self.state_counts.copy()
+        # new.state_counts = defaultdict(int)
+        return new
+
+    def get_hash(self) -> int:
+        """Returns Canonical Hash"""
+        _, h = self.zobrist.get_hash(self.player, self.opponent, self.cur_player)
+        return h
+
+    def get_raw_hash(self) -> int:
+        return self.zobrist._compute_hash(self.player, self.opponent, self.cur_player)
+
+    def get_hash_with_mirror(self) -> tuple[bool, int]:
+        """Returns (isMirrored, Canonical Hash)"""
         return self.zobrist.get_hash(self.player, self.opponent, self.cur_player)
 
-    def _record_state(self):
-        self.state_counts[self._get_current_hash()] += 1
+    def _record_state(self) -> None:
+        self.state_counts[self.get_raw_hash()] += 1
 
     def is_threefold_repetition(self) -> bool:
-        return self.state_counts[self._get_current_hash()] >= 3
+        return self.state_counts[self.get_raw_hash()] >= 3
 
-    def switch_turn(self):
+    def switch_turn(self) -> None:
         self.player, self.opponent = self.opponent, self.player
         self.cur_player = 1 - self.cur_player
 
@@ -71,6 +104,30 @@ class PopOut:
             if m & (m >> (2 * shift)):
                 return True
         return False
+
+    def get_winner(self) -> int | None:
+        """Return winner ID (0 or 1) or None if no winner"""
+        if self.win(opponent=False):
+            return self.cur_player
+        if self.win(opponent=True):
+            return 1 - self.cur_player
+        return None
+
+    def get_valid_actions(self) -> list[Action]:
+        """Get all legal actions from current state"""
+        actions = []
+
+        for col in range(COLS):
+            # Drop: column is valid if it has any empty space
+            empty_in_col = (~self.get_occupied()) & self._col_mask(col)
+            if empty_in_col != 0:
+                actions.append(('drop', col))
+
+            # Pop: valid if bottom bit belongs to current player
+            bottom_bit = 1 << (col * 7)
+            if self.player & bottom_bit:
+                actions.append(('pop', col))
+        return actions
 
     def _col_mask(self, col: int) -> int:
         """Create mask for a column"""

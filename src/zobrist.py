@@ -7,7 +7,7 @@ class Zobrist:
         self.zArray = [[getrandbits(64) for _ in range(2)] for _ in range(42)]
         self.zTurn = [getrandbits(64), getrandbits(64)]  # [player id i]
 
-    def get_hash(self, player, opponent, cur_player):
+    def _compute_hash(self, player, opponent, cur_player):
         """
         Args:
             player: current player bitboard
@@ -30,3 +30,24 @@ class Zobrist:
 
         h ^= self.zTurn[cur_player]
         return h
+
+    def _mirror(self, bitboard: int):
+        """Reflect columns: col 0 <-> col 6, col 1 <-> col 5, col 2 <-> col 4, col 3 stays"""
+        result = 0
+        for col in range(7):
+            mirrored_col = 6 - col
+            # Extract col's 6 bits and place them at mirrored_col's position
+            col_bits = (bitboard >> (col * 7)) & 0x3F  # 0x3F = 0b111111 (6 bits)
+            result |= col_bits << (mirrored_col * 7)
+        return result
+
+    def get_hash(self, player, opponent, cur_player):
+        """
+        Returns:
+            (isMirrored, Canonical hash)
+        """
+        h_normal = self._compute_hash(player, opponent, cur_player)
+        h_mirror = self._compute_hash(self._mirror(player), self._mirror(opponent), cur_player)
+        if h_mirror < h_normal:
+            return True, h_mirror
+        return False, h_normal
