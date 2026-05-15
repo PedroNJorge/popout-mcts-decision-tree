@@ -1,4 +1,4 @@
-from .types import PhysicalAction
+from .types import Action
 from .zobrist import Zobrist
 from collections import defaultdict
 
@@ -9,13 +9,12 @@ COLS = 7
 class PopOut:
     def __init__(self, first_player: int = 0):
         """
-        Each bitboard is of the format [col0], [col1], ..., [col6],
-        where col_i = 6 bits, i = 0(1)6.
+        Each bitboard is of the format:
+            [col6]0[col5]0[col4]0[col3]0[col2]0[col1]0[col0]
 
-        Note: Row0 is the bottom of the board.
-        Each col_i is of the format [row0, row1, ..., row5]
-
-        Between each col_i there is a filler bit
+        Note: between each [col_i] and [col_j] there is a filler bit;
+              the right-most bit in [col_i] represents row0, and the
+              left-most bit represents row5
         """
         # Create filler mask (bit 6 of each column)
         self.filler_mask = 0
@@ -33,7 +32,19 @@ class PopOut:
         self._record_state()  # Record initial state
 
     def __str__(self):
-        return f"Player bits: {self.player:042b}\nOpponent bits: {self.opponent:042b}\n"
+        display = [['-' for _ in range(COLS)] for _ in range(ROWS)]
+        for bit in range(48):
+            col = bit // 7
+            row = bit % 7
+            if row >= ROWS or col >= COLS:
+                continue
+            if (self.player >> bit) & 1:
+                display_row = ROWS - 1 - row
+                display[display_row][col] = 'O'
+            elif (self.opponent >> bit) & 1:
+                display_row = ROWS - 1 - row
+                display[display_row][col] = 'X'
+        return '\n'.join(' '.join(row) for row in display)
 
     def copy(self):
         """Create a lightweight copy with only essential attributes."""
@@ -52,15 +63,18 @@ class PopOut:
         _, h = self.zobrist.get_hash(self.player, self.opponent, self.cur_player)
         return h
 
+    def get_raw_hash(self) -> int:
+        return self.zobrist._compute_hash(self.player, self.opponent, self.cur_player)
+
     def get_hash_with_mirror(self) -> tuple[bool, int]:
         """Returns (isMirrored, Canonical Hash)"""
         return self.zobrist.get_hash(self.player, self.opponent, self.cur_player)
 
     def _record_state(self) -> None:
-        self.state_counts[self.get_hash()] += 1
+        self.state_counts[self.get_raw_hash()] += 1
 
     def is_threefold_repetition(self) -> bool:
-        return self.state_counts[self.get_hash()] >= 3
+        return self.state_counts[self.get_raw_hash()] >= 3
 
     def switch_turn(self) -> None:
         self.player, self.opponent = self.opponent, self.player
@@ -99,7 +113,7 @@ class PopOut:
             return 1 - self.cur_player
         return None
 
-    def get_valid_actions(self) -> list[PhysicalAction]:
+    def get_valid_actions(self) -> list[Action]:
         """Get all legal actions from current state"""
         actions = []
 
