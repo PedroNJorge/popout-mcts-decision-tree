@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Callable
-from .types import CanonicalAction
+from .types import Action
 
 K = TypeVar('K')
 
@@ -16,7 +16,7 @@ class BaseEntry(ABC, Generic[K]):
 E = TypeVar('E', bound=BaseEntry)
 
 
-class EdgeEntry(BaseEntry[tuple[int, CanonicalAction]]):
+class EdgeEntry(BaseEntry[tuple[int, Action]]):
     """
     Entry in edge transposition table.
     Notation:
@@ -25,13 +25,13 @@ class EdgeEntry(BaseEntry[tuple[int, CanonicalAction]]):
         Q(s, a) -> mean action value: W(s, a) / N(s, a)
     """
 
-    def __init__(self, parent_hash: int, action: CanonicalAction):
+    def __init__(self, parent_hash: int, action: Action):
         self._key = (parent_hash, action)
         self.N = 0
         self.W = 0.0
 
     @property
-    def key(self) -> tuple[int, CanonicalAction]:
+    def key(self) -> tuple[int, Action]:
         return self._key
 
     @property
@@ -57,14 +57,15 @@ class NodeEntry(BaseEntry[int]):
     """
 
     def __init__(self, state_hash: int,
-                 children: dict[CanonicalAction, int] = None,
-                 priors: dict[CanonicalAction, float] = None):
+                 children: dict[Action, int] = None,
+                 priors: dict[Action, float] = None):
         self._key = state_hash
         self.N: int = 0
         self.V: float = 0.0
-        self.P: dict[CanonicalAction, float] = priors or {}
-        self.children: dict[CanonicalAction, int] = children or {}
+        self.P: dict[Action, float] = priors or {}
+        self.children: dict[Action, int] = children or {}
         self.is_terminal: bool = False
+        self.winner = None
 
     @property
     def key(self):

@@ -1,2 +1,1 @@
-PhysicalAction = tuple[str, int]
-CanonicalAction = tuple[str, int]
+Action = tuple[str, int]
