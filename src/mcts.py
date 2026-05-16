@@ -51,29 +51,6 @@ class MCTS:
         Returns:
             Dictionary mapping Action -> probability
         """
-        valid = state.get_valid_actions()
-        valid_set = set(valid)
-
-        # Immediate win
-        for action in valid:
-            if self.heuristic.is_winning_move(state, action):
-                return {a: (1.0 if a == action else 0.0) for a in valid}
-
-        # Find opponent's winning moves using swapped bitboards (no copy)
-        # is_winning_move reads state.player — swap so opponent is "player"
-        class SwappedState:
-            def __init__(self, s):
-                self.player = s.opponent
-                self.opponent = s.player
-                self.filler_mask = s.filler_mask
-                self._col_mask = s._col_mask
-
-        swapped = SwappedState(state)
-        for action in valid:  # opponent can only threaten via valid actions too
-            if action in valid_set and self.heuristic.is_winning_move(swapped, action):
-                return {a: (1.0 if a == action else 0.0) for a in valid}
-
-        # Proceed with regular MCTS
         sim_count = simulations or self.max_simulations
 
         # Create root node
@@ -98,9 +75,6 @@ class MCTS:
 
             # Backpropagation
             self._backpropagate(leaf_node, path, result)
-
-            if sim == 10:
-                print(self.node_tt.get(root_hash).children)
 
             pbar.update(1)
             if sim % 100 == 0 and sim > 0:
@@ -289,6 +263,25 @@ class MCTS:
 
         return best_child, best_state, best_action
 
+    def _get_heuristic(self, state: PopOut, valid: list[Action]) -> Action | None:
+        """Return an action that wins for the current player or blocks the other"""
+        valid_set = set(valid)
+        # Immediate win
+        for action in valid_set:
+            if self.heuristic.is_winning_move(state, action):
+                return action
+
+        # Find opponent's winning moves using swapped bitboards (no copy)
+        # is_winning_move reads state.player — swap so opponent is "player"
+        state.player, state.opponent = state.opponent, state.player
+        swapped_valid = set(state.get_valid_actions())
+        for action in swapped_valid:  # opponent can only threaten via valid actions too
+            if action in valid_set and self.heuristic.is_winning_move(state, action):
+                state.player, state.opponent = state.opponent, state.player
+                return action
+        state.player, state.opponent = state.opponent, state.player
+        return None
+
     def _simulate(self, state: PopOut, max_depth: int = 100) -> float:
         """
         Random rollout until terminal state.
@@ -311,7 +304,8 @@ class MCTS:
             if not valid_actions:  # board full, can't pop
                 return 0.0
 
-            action = random.choice(valid_actions)
+            # Use "win immediately" or "block win" heuristic to make more accurate rollouts
+            action = self._get_heuristic(state, valid_actions) or random.choice(valid_actions)
             current = self._transition(current, action)
             depth += 1
 
@@ -364,9 +358,6 @@ class MCTS:
                 action: (visits[action] ** (1.0 / temperature)) / total_weighted
                 for action in children
             }
-
-        print(f"valid_actions = {valid_set}")
-        print(f"canonical probs = {probs}")
 
         # Build G(s) = A(s) / ~ using canonical hashes
         groups: dict[int, list[Action]] = defaultdict(list)

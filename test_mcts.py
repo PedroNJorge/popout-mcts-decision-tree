@@ -2,10 +2,10 @@ from src import MCTS, PopOut
 
 if __name__ == "__main__":
     game = PopOut()
-    game.player   = 0b0000000000000000000000000110000000000000000000000
-    game.opponent = 0b0000000000000000000000000001000000000000010000001
+    # game.player   = 0b0000000000000000000000001110000000000000000000000
+    # game.opponent = 0b0000000000000000000000000001000000000000010000001
     print(game)
-    mcts = MCTS(exploration_constant=1.2, max_simulations=100000)
+    mcts = MCTS(exploration_constant=1.2, max_simulations=800)
     policy = mcts.search(game, show_progress=True)
     print("Action probabilities:")
     for move, prob in sorted(policy.items(), key=lambda x: -x[1])[:]:
