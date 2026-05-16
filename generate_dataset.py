@@ -88,7 +88,12 @@ def generate_dataset(n_games: int = 100,
     for col in range(COLS):
         for row in range(ROWS):
             feature_cols.append(f"cell_r{row}c{col}")
-    header = feature_cols + ["best_action"]
+
+    action_cols = []
+    for atype in ['drop', 'pop']:
+        for col in range(COLS):
+            action_cols.append(f"('{atype}', {col})")
+    header = feature_cols + action_cols + ["best_action"]
 
     # Check if file exists and decide mode
     file_exists = os.path.isfile(output_path)
@@ -127,13 +132,20 @@ def generate_dataset(n_games: int = 100,
                 # Apply MCTS and sample next move from its PMF
                 probs = mcts.search(game, simulations=simulations)
 
+                # Build probability vector of ALL actions from MCTS
+                probs_vector = []
+                for atype in ['drop', 'pop']:
+                    for col in range(COLS):
+                        p = probs.get((atype, col), 0.0)
+                        probs_vector.append(p)
+
                 actions = list(probs.keys())
                 weights = [probs[a] for a in actions]
                 chosen = random.choices(actions, weights=weights, k=1)[0]
 
                 # Write move in csv
                 X = encode_state(game)
-                writer.writerow([*X, chosen])
+                writer.writerow([*X, *probs_vector, chosen])
                 written += 1
 
                 if written % 10000 == 0:
