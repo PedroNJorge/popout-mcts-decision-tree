@@ -1,10 +1,10 @@
 import curses
 import time
 from .game import PopOut, ROWS, COLS
-from .players import HumanPlayer, RandomPlayer, MCTSPlayer
+from .players import HumanPlayer, ID3Player, MCTSPlayer
 
 EMPTY = '-'
-PLAYER1 = 'X'
+PLAYER1 = 'X' 
 PLAYER2 = 'O'
 
 
@@ -81,7 +81,7 @@ class PopOutCLI:
         options = [
             "1. Player vs Player",
             "2. Player vs AI (MCTS)",
-            "3. AI (MCTS) vs AI (Random)",
+            "3. AI (MCTS) vs AI (ID3 Decision Tree)",
             "4. Quit"
         ]
         current = 0
@@ -110,7 +110,8 @@ class PopOutCLI:
         elif mode == 1:
             self.players = [HumanPlayer("You", 0), MCTSPlayer("Bot MCTS", 1)]
         elif mode == 2:
-            self.players = [MCTSPlayer("MCTS Alpha", 0), RandomPlayer("Random Bot", 1)]
+            id3_bot = ID3Player("ID3 Bot", 1, model_path="id3_model.pkl")
+            self.players = [MCTSPlayer("MCTS Alpha", 0), id3_bot]
 
     def get_display_board(self):
         """Convert bitboard to display grid"""
