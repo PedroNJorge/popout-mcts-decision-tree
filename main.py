@@ -1,5 +1,5 @@
 import curses
-from src import PopOutCLI
+from src.cli import PopOutCLI
 
 
 def main(stdscr):
